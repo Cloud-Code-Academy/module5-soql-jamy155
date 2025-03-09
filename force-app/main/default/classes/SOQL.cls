@@ -79,7 +79,6 @@ public with sharing class SOQL {
 	 */
 	public static List<Opportunity> GetClosedWonOpportunityCountByAccount( Id accountId) {
 		// gets the account with the param 
-		Account acc = [SELECT Id  FROM Account WHERE Id = :accountId ];
 		
 		return  [SELECT Id , AccountId , Name , StageName, CloseDate, Amount FROM Opportunity WHERE  AccountId = :accountId AND StageName = 'Closed Won' ] ;
 	}
@@ -94,9 +93,8 @@ public with sharing class SOQL {
 	public static Integer GetAccountCount() {
 		
 		// gets the count of all the account records
-		List<AggregateResult> result = [SELECT COUNT(Id) cnt FROM Account];
 	
-		return (Integer) result[0].get('cnt');
+		return [SELECT COUNT() FROM Account];
 	}
 
 
@@ -390,8 +388,7 @@ public with sharing class SOQL {
 	 */
 	public static void cloneLineItems(Id origOppId, List<Id> cloneOppIds) {
 		// Query the original Opportunity Line Items
-		Opportunity opp = [SELECT Id FROM Opportunity WHERE Id = :origOppId ];  	
-
+		
 		// Create a list to hold the new line items
 		List<OpportunityLineItem> items = new List<OpportunityLineItem>();
 
@@ -403,12 +400,13 @@ public with sharing class SOQL {
 			num =  Integer.valueOf(Math.random() * 3);
 		}
 		
+		List<OpportunityLineItem> OppLineItems = [SELECT Id , OpportunityId , Quantity ,UnitPrice, PricebookEntryId  FROM OpportunityLineItem WHERE OpportunityId = :origOppId ] ;
 
 		// Loop through each cloned Opportunity Id
 		for (Id op : cloneOppIds) {
 
 			// Loop through each original line item
-			for (OpportunityLineItem item : [SELECT Id , OpportunityId , Quantity ,UnitPrice, PricebookEntryId  FROM OpportunityLineItem WHERE OpportunityId = :origOppId ]) {
+			for (OpportunityLineItem item :OppLineItems) {
 				// Clone the original line item and add the random number to the quantity
 				OpportunityLineItem newItem = new OpportunityLineItem(OpportunityId = op , UnitPrice = item.UnitPrice , Quantity = num , PricebookEntryId = item.PricebookEntryId);
 				items.add(newItem);
@@ -425,7 +423,7 @@ public with sharing class SOQL {
 	 * @return A list of filtered Opportunity
 	 */
 	public static List<Opportunity> getOpportunityDetailsForClosedWon() {
-		return [SELECT Id, AccountId, OwnerId, StageName, Name, Account.Name FROM Opportunity WHERE StageName = 'Closed Won']; 
+		return [SELECT Name, Account.Name, Owner.Name FROM Opportunity WHERE StageName = 'Closed Won']; 
 	}
 
 	/**
@@ -445,23 +443,30 @@ public with sharing class SOQL {
 		}
 
 		// Query the Contacts
-		List<Contact> contacts = [SELECT Id, AccountId, FirstName FROM Contact WHERE AccountId IN :accounts ORDER BY FirstName ASC];
+		List<Contact> contacts = [SELECT Id, AccountId, FirstName FROM Contact WHERE AccountId IN :accounts ORDER BY FirstName DESC];
 
-		Map<Id,List<String>> accountToContactMap = new Map<Id,List<Id>>();
+		//Map<Id,List<String>> accountToContactMap = new Map<Id,List<Id>>();
+		Map<Id,Contact> accountToContactMap = new Map<Id,Contact>();
 
 		// Loop through each Contact and add the Account Id and Contact to the map
 		for(Contact cont : contacts){
-			if(!accountToContactMap.containsKey(cont.AccountId)){
+			/*if(!accountToContactMap.containsKey(cont.AccountId)){
 				accountToContactMap.put(cont.AccountId, new List<Id>());
 			}
 			accountToContactMap.get(cont.AccountId).add(cont.Id);
+
+			*/
+
+			accountToContactMap.put(cont.AccountId, cont);
 		}
 
 		// Loop through each Opportunity
 		for (Opportunity opp : Opportunities) {
 
 			// Update the Opportunity primary contact from accountToContactMap
-			opp.Primary_Contact__c = accountToContactMap.get(opp.AccountId)[0];
+			//opp.Primary_Contact__c = accountToContactMap.get(opp.AccountId)[0];
+			opp.Primary_Contact__c = accountToContactMap.get(opp.AccountId).id;
+			
 			
 		}
 		// Update the Opportunities
